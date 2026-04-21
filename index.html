@@ -120,6 +120,24 @@
   .progress-mini > span{display:block;height:100%;background:var(--lime)}
   .task-notes{grid-column:2 / -1;color:var(--grey-700);font-size:12px;margin-top:-4px}
   .add-task-row{padding:10px;text-align:center;border-top:1px dashed var(--grey-300)}
+  /* Subtasks inline */
+  .sub-badge{font-family:'Antonio';font-size:11px;padding:2px 7px;border:1px solid var(--grey-500);background:var(--white);color:var(--grey-700);letter-spacing:.04em}
+  .sub-badge.all-done{background:var(--green);color:var(--white);border-color:var(--green)}
+  .sub-chev{background:none;border:1px solid var(--grey-300);padding:2px 6px;cursor:pointer;font-family:'Antonio';font-size:11px;color:var(--grey-700)}
+  .sub-chev:hover{background:var(--grey-100);color:var(--black);border-color:var(--black)}
+  .subtasks-panel{grid-column:1 / -1;margin-top:6px;padding:8px 4px 4px;border-top:1px dashed var(--grey-300);display:none}
+  .subtasks-panel.open{display:block}
+  .subtask-line{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:4px 6px;font-size:13px}
+  .subtask-line:hover{background:var(--grey-100)}
+  .subtask-line input[type="checkbox"]{width:16px;height:16px;cursor:pointer;accent-color:var(--black)}
+  .subtask-line .st-text.done{color:var(--grey-500);text-decoration:line-through}
+  .subtask-line .st-week{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;padding:1px 6px;border:1px solid var(--grey-300);color:var(--grey-700);background:var(--grey-100);white-space:nowrap}
+  /* Subtasks in modal */
+  .subtask-edit-row{display:grid;grid-template-columns:auto 1fr 120px auto;gap:6px;align-items:center;padding:4px 6px;border:1px solid var(--grey-200);margin-bottom:-1px;background:var(--white)}
+  .subtask-edit-row input[type="checkbox"]{width:16px;height:16px;accent-color:var(--black)}
+  .subtask-edit-row input[type="text"]{padding:5px 8px;font-size:13px;border:1px solid var(--grey-300)}
+  .subtask-add{display:grid;grid-template-columns:1fr 120px auto;gap:6px;margin-top:8px}
+  .subtask-add input{padding:6px 8px;font-size:13px;border:1px solid var(--black)}
   /* Matrix */
   .matrix-wrap{overflow-x:auto;border:1px solid var(--black)}
   table.matrix{border-collapse:collapse;width:100%;font-size:13px;min-width:720px}
@@ -432,13 +450,13 @@ function rowToTask(r){
   return { id:r.id, name:r.name, stream:r.stream_id||'', priority:r.priority||5,
            owners:r.owners||[], status:r.status||'Backlog', progress:r.progress||0,
            start:r.start_date||'', end:r.end_date||'', notes:r.notes||'',
-           objectives:r.objectives||[], sort_order:r.sort_order||0 };
+           objectives:r.objectives||[], subtasks:r.subtasks||[], sort_order:r.sort_order||0 };
 }
 function taskToRow(t){
   return { id:t.id, name:t.name, stream_id:t.stream||null, priority:t.priority||5,
            owners:t.owners||[], status:t.status||'Backlog', progress:t.progress||0,
            start_date:t.start||null, end_date:t.end||null, notes:t.notes||'',
-           objectives:t.objectives||[], sort_order:t.sort_order||0 };
+           objectives:t.objectives||[], subtasks:t.subtasks||[], sort_order:t.sort_order||0 };
 }
 
 /* ============================================================
@@ -628,6 +646,20 @@ function toggleStream(h3){
 }
 function taskRowHtml(t){
   const statusClass = t.status==="In corso"?"corso":t.status==="Backlog"?"backlog":t.status==="In review"?"review":"done";
+  const subs = t.subtasks||[];
+  const subDone = subs.filter(s=>s.done).length;
+  const subTotal = subs.length;
+  const allDone = subTotal>0 && subDone===subTotal;
+  const subBadge = subTotal>0
+    ? `<span class="sub-badge mono ${allDone?'all-done':''}" title="${subDone} completate su ${subTotal}">${subDone}/${subTotal}</span>
+       <button class="sub-chev" onclick="event.stopPropagation();togglePanel('${t.id}')" title="Mostra sotto-task">▾</button>`
+    : '';
+  const subLines = subs.map(s=>`
+    <div class="subtask-line" onclick="event.stopPropagation()">
+      <input type="checkbox" ${s.done?'checked':''} onchange="toggleSubtaskDone('${t.id}','${s.id}',this.checked)">
+      <span class="st-text ${s.done?'done':''}">${escapeHtml(s.text||"")}</span>
+      ${s.week?`<span class="st-week">${escapeHtml(s.week)}</span>`:'<span></span>'}
+    </div>`).join("");
   return `
     <div class="task-row" onclick="openTaskEditor('${t.id}')">
       <span class="prio p${t.priority}">${t.priority}</span>
@@ -639,10 +671,34 @@ function taskRowHtml(t){
       </div>
       <span class="status-chip ${statusClass}">${escapeHtml(t.status)}</span>
       <div class="progress-mini" title="${t.progress}% completato"><span style="width:${Math.max(0,Math.min(100,+t.progress||0))}%"></span></div>
-      <span class="mono" style="font-size:12px">${shortDate(t.end)}</span>
+      <span class="mono" style="font-size:12px">${shortDate(t.end)}${subBadge}</span>
       <div class="row-actions"><button class="btn icon" title="Modifica" onclick="event.stopPropagation();openTaskEditor('${t.id}')">✎</button></div>
       <div class="task-notes">${escapeHtml(t.notes||"")}</div>
+      ${subTotal>0?`<div class="subtasks-panel" id="sub_${t.id}">${subLines}</div>`:''}
     </div>`;
+}
+function togglePanel(taskId){
+  const panel = document.getElementById("sub_"+taskId);
+  if(panel) panel.classList.toggle("open");
+}
+async function toggleSubtaskDone(taskId, subId, done){
+  const task = DATA.tasks.find(t=>t.id===taskId);
+  if(!task) return;
+  const sub = (task.subtasks||[]).find(s=>s.id===subId);
+  if(!sub) return;
+  sub.done = done;
+  setSaveStatus("saving");
+  try{
+    const { error } = await sb.from("tasks").update({ subtasks: task.subtasks }).eq("id", taskId);
+    if(error) throw error;
+    setSaveStatus("ok");
+    // re-render per aggiornare badge/progress
+    renderFilteredViews();
+  }catch(e){
+    sub.done = !done;
+    setSaveStatus("error");
+    alert("Errore salvataggio sotto-task: "+(e.message||e));
+  }
 }
 
 function renderMatrix(){
@@ -766,7 +822,7 @@ function openTaskEditor(taskId, streamIdPrefill){
   const t = taskId ? DATA.tasks.find(x=>x.id===taskId) : {
     id:null, name:"", stream: streamIdPrefill || (DATA.streams[0]?.id || ""), priority:5,
     owners:[], status:"Backlog", progress:0, start:"", end:"",
-    notes:"", objectives:[]
+    notes:"", objectives:[], subtasks:[]
   };
   DATA._edit = JSON.parse(JSON.stringify(t));
   const streamOpts = DATA.streams.map(s=>`<option value="${s.id}" ${s.id===t.stream?'selected':''}>${escapeHtml(s.name)}</option>`).join("");
@@ -805,7 +861,42 @@ function openTaskEditor(taskId, streamIdPrefill){
         <button type="button" class="btn small" onclick="addChip('objective')">+ Aggiungi obiettivo</button>
       </div>
     </div>
+    <div class="field full">
+      <label>Sotto-task settimanali</label>
+      <div class="field-hint" style="margin-bottom:6px">Checkbox = fatto. Il campo "settimana" è libero (es. "W17", "Apr 20-26", "questa sett."). Si salva al click su Salva.</div>
+      <div id="f_subtasks_list">${renderSubtaskEditRows(t.subtasks||[])}</div>
+      <div class="subtask-add">
+        <input type="text" id="f_sub_new_text" placeholder="Nuova sotto-task…" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubtaskEdit()}">
+        <input type="text" id="f_sub_new_week" placeholder="Settimana (opt)">
+        <button type="button" class="btn small primary" onclick="addSubtaskEdit()">+ Aggiungi</button>
+      </div>
+    </div>
   `, !!taskId);
+}
+function renderSubtaskEditRows(subtasks){
+  if(!subtasks || subtasks.length===0) return '<div class="field-hint">Nessuna sotto-task.</div>';
+  return subtasks.map((s,i)=>`
+    <div class="subtask-edit-row">
+      <input type="checkbox" ${s.done?'checked':''} onchange="DATA._edit.subtasks[${i}].done=this.checked">
+      <input type="text" value="${escapeHtml(s.text||'')}" onchange="DATA._edit.subtasks[${i}].text=this.value" placeholder="Testo sotto-task">
+      <input type="text" value="${escapeHtml(s.week||'')}" onchange="DATA._edit.subtasks[${i}].week=this.value" placeholder="W..">
+      <button type="button" class="btn icon danger" onclick="removeSubtaskEdit(${i})" title="Elimina">✕</button>
+    </div>`).join("");
+}
+function addSubtaskEdit(){
+  const text = ($("#f_sub_new_text").value||"").trim();
+  if(!text) return;
+  const week = ($("#f_sub_new_week").value||"").trim();
+  DATA._edit.subtasks = DATA._edit.subtasks || [];
+  DATA._edit.subtasks.push({ id:newId("st"), text, done:false, week });
+  $("#f_sub_new_text").value = "";
+  $("#f_sub_new_week").value = "";
+  $("#f_subtasks_list").innerHTML = renderSubtaskEditRows(DATA._edit.subtasks);
+  $("#f_sub_new_text").focus();
+}
+function removeSubtaskEdit(i){
+  DATA._edit.subtasks.splice(i,1);
+  $("#f_subtasks_list").innerHTML = renderSubtaskEditRows(DATA._edit.subtasks);
 }
 function addChip(type, valueOverride){
   if(type==="owner"){
@@ -898,6 +989,7 @@ async function saveCurrent(){
         end: $("#f_end").value || "",
         notes: $("#f_notes").value,
         objectives: DATA._edit.objectives || [],
+        subtasks: DATA._edit.subtasks || [],
         sort_order: modalEntityId
           ? (DATA.tasks.find(x=>x.id===modalEntityId)?.sort_order || 0)
           : nextSortOrder(DATA.tasks)
