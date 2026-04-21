@@ -1,0 +1,1146 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Standard Football — Tasks & Streams Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --black:#000; --white:#fff;
+    --grey-900:#111; --grey-700:#333; --grey-500:#666; --grey-300:#bbb; --grey-200:#e5e5e5; --grey-100:#f4f4f4;
+    --lime:#B9FF69; --bluette:#4400B3; --green:#009951; --red:#CC0000; --amber:#F2A900;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--white);color:var(--black);font-family:'Atkinson Hyperlegible',system-ui,sans-serif;font-size:14px;line-height:1.45}
+  h1,h2,h3,h4{font-family:'Antonio',sans-serif;letter-spacing:.02em;margin:0;text-transform:uppercase;font-weight:700}
+  h1{font-size:34px;line-height:1.05}
+  h2{font-size:20px;line-height:1.1}
+  h3{font-size:15px;letter-spacing:.08em}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+  button{font-family:inherit}
+  /* Header */
+  header{border-bottom:2px solid var(--black);padding:20px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
+  .brand-mark{display:flex;align-items:center;gap:14px}
+  .brand-logo{height:44px;width:auto;display:block}
+  .brand-logo.lg{height:64px;margin:0 auto 18px}
+  .brand-sub{font-family:'Atkinson Hyperlegible';font-size:12px;color:var(--grey-500);text-transform:uppercase;letter-spacing:.12em;margin-top:6px}
+  .header-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .header-meta{font-size:11px;color:var(--grey-500);text-transform:uppercase;letter-spacing:.08em;margin-right:8px}
+  .btn{font-family:'Antonio';text-transform:uppercase;letter-spacing:.08em;font-size:12px;padding:8px 14px;border:1.5px solid var(--black);background:var(--white);cursor:pointer}
+  .btn:hover{background:var(--black);color:var(--white)}
+  .btn.primary{background:var(--lime)}
+  .btn.primary:hover{background:var(--black);color:var(--lime)}
+  .btn.danger:hover{background:var(--red);color:var(--white);border-color:var(--red)}
+  .btn.small{font-size:11px;padding:4px 8px;border-width:1px}
+  .btn.icon{padding:4px 7px;border-width:1px;font-size:12px;min-width:28px;line-height:1}
+  .btn[disabled]{opacity:.4;cursor:not-allowed}
+  /* User menu */
+  .user-chip{font-size:11px;color:var(--grey-700);text-transform:uppercase;letter-spacing:.08em;padding:4px 10px;border:1px solid var(--grey-300);background:var(--grey-100);display:inline-flex;align-items:center;gap:6px}
+  .user-chip .led{width:6px;height:6px;border-radius:50%;background:var(--green)}
+  /* Layout */
+  main{padding:24px 32px 96px;max-width:1440px;margin:0 auto}
+  section{margin-top:32px}
+  .section-title{display:flex;align-items:center;gap:12px;margin-bottom:16px;border-bottom:1px solid var(--grey-200);padding-bottom:8px;flex-wrap:wrap}
+  .section-title h2{flex:none}
+  .section-title small{color:var(--grey-500);font-size:12px;text-transform:uppercase;letter-spacing:.1em}
+  .section-title .spacer{flex:1}
+  /* Save status */
+  .save-status{font-family:'Atkinson Hyperlegible';font-size:11px;color:var(--grey-500);text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:6px}
+  .save-status .led{width:8px;height:8px;border-radius:50%;background:var(--green)}
+  .save-status.saving .led{background:var(--amber);animation:blink 1s infinite}
+  .save-status.error .led{background:var(--red)}
+  @keyframes blink{50%{opacity:.3}}
+  /* Obiettivi */
+  .obj-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+  .obj-card{border:2px solid var(--black);padding:16px;background:var(--white);position:relative;display:flex;flex-direction:column;gap:10px}
+  .obj-card .accent{position:absolute;top:0;left:0;height:6px;width:100%}
+  .obj-card.lime .accent{background:var(--lime)}
+  .obj-card.bluette .accent{background:var(--bluette)}
+  .obj-card h3{font-size:13px;letter-spacing:.04em;padding-top:6px}
+  .obj-card .title{font-family:'Antonio';font-size:22px;line-height:1.1;text-transform:uppercase}
+  .obj-card .desc{color:var(--grey-700);font-size:13px;flex:1}
+  .obj-meta{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--grey-700)}
+  .obj-actions{display:flex;gap:4px;position:absolute;top:12px;right:10px;opacity:0;transition:opacity .15s}
+  .obj-card:hover .obj-actions{opacity:1}
+  .progress{height:8px;background:var(--grey-200);position:relative;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--lime)}
+  .obj-card.bluette .progress > span{background:var(--bluette)}
+  .deadline-badge{display:inline-block;padding:3px 8px;border:1px solid var(--black);font-size:11px;text-transform:uppercase;letter-spacing:.08em;background:var(--white)}
+  .deadline-badge.urgent{background:var(--black);color:var(--white)}
+  .add-card{border:2px dashed var(--grey-300);color:var(--grey-500);display:flex;align-items:center;justify-content:center;text-transform:uppercase;letter-spacing:.08em;font-family:'Antonio';font-size:14px;cursor:pointer;min-height:140px}
+  .add-card:hover{border-color:var(--black);color:var(--black);background:var(--grey-100)}
+  /* Filters */
+  .filters{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;padding:12px 16px;border:1px solid var(--grey-200);background:var(--grey-100);margin-bottom:16px}
+  .filters label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--grey-700);display:flex;gap:8px;align-items:center}
+  .filters select,.filters input[type="text"]{font-family:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--black);background:var(--white);min-width:160px}
+  /* Tabs */
+  .tabs{display:flex;gap:0;border-bottom:2px solid var(--black);margin-bottom:16px;flex-wrap:wrap}
+  .tab{font-family:'Antonio';font-size:14px;letter-spacing:.08em;text-transform:uppercase;padding:10px 18px;background:var(--white);border:1px solid var(--black);border-bottom:none;cursor:pointer;margin-right:-1px;margin-bottom:-2px}
+  .tab.active{background:var(--black);color:var(--white)}
+  .view{display:none}
+  .view.active{display:block}
+  /* Tree view */
+  .tree{display:grid;grid-template-columns:260px 1fr;gap:24px}
+  @media (max-width:900px){.tree{grid-template-columns:1fr}}
+  .tree-root{border:2px solid var(--black);padding:14px;height:fit-content;position:sticky;top:12px}
+  .tree-root .root-title{font-family:'Antonio';font-size:22px;text-transform:uppercase;line-height:1;margin-bottom:6px}
+  .tree-root .root-sub{font-size:12px;color:var(--grey-500);text-transform:uppercase;letter-spacing:.1em}
+  .stream-card{border:1px solid var(--black);margin-bottom:14px;background:var(--white)}
+  .stream-head{padding:10px 14px;background:var(--grey-100);display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--black)}
+  .stream-head .dot{width:10px;height:10px;flex:none}
+  .stream-head h3{flex:1;cursor:pointer}
+  .stream-head .count{font-size:12px;color:var(--grey-700)}
+  .stream-head .chev{font-family:'Antonio';font-size:14px;color:var(--grey-700);cursor:pointer}
+  .stream-head-actions{display:flex;gap:4px}
+  .stream-body{padding:8px 10px}
+  .stream-body.collapsed{display:none}
+  .task-row{display:grid;grid-template-columns:auto 1fr auto auto auto auto;gap:10px;align-items:center;padding:8px;border-bottom:1px solid var(--grey-200);cursor:pointer}
+  .task-row:last-child{border-bottom:none}
+  .task-row:hover{background:var(--grey-100)}
+  .task-row .row-actions{display:flex;gap:4px;opacity:0;transition:opacity .15s}
+  .task-row:hover .row-actions{opacity:1}
+  .prio{font-family:'Antonio';font-size:13px;padding:3px 6px;border:1.5px solid var(--black);min-width:30px;text-align:center;background:var(--white)}
+  .prio.p10,.prio.p9{background:var(--black);color:var(--white)}
+  .prio.p8{background:var(--lime)}
+  .prio.p7,.prio.p6{background:var(--white)}
+  .prio.p5,.prio.p4,.prio.p3,.prio.p2,.prio.p1{background:var(--white);color:var(--grey-500);border-color:var(--grey-300)}
+  .task-name{font-weight:700;font-size:14px}
+  .task-owners{display:flex;gap:4px;flex-wrap:wrap}
+  .owner-chip{font-size:11px;padding:2px 6px;border:1px solid var(--grey-500);color:var(--grey-700);background:var(--white);white-space:nowrap}
+  .status-chip{font-family:'Antonio';font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border:1px solid var(--black)}
+  .status-chip.corso{background:var(--lime);color:var(--black)}
+  .status-chip.backlog{background:var(--white);color:var(--grey-700);border-color:var(--grey-500)}
+  .status-chip.review{background:var(--amber);color:var(--black)}
+  .status-chip.done{background:var(--green);color:var(--white)}
+  .progress-mini{width:80px;height:6px;background:var(--grey-200);position:relative}
+  .progress-mini > span{display:block;height:100%;background:var(--lime)}
+  .task-notes{grid-column:2 / -1;color:var(--grey-700);font-size:12px;margin-top:-4px}
+  .add-task-row{padding:10px;text-align:center;border-top:1px dashed var(--grey-300)}
+  /* Subtasks inline */
+  .sub-badge{font-family:'Antonio';font-size:11px;padding:2px 7px;border:1px solid var(--grey-500);background:var(--white);color:var(--grey-700);letter-spacing:.04em}
+  .sub-badge.all-done{background:var(--green);color:var(--white);border-color:var(--green)}
+  .sub-chev{background:none;border:1px solid var(--grey-300);padding:2px 6px;cursor:pointer;font-family:'Antonio';font-size:11px;color:var(--grey-700)}
+  .sub-chev:hover{background:var(--grey-100);color:var(--black);border-color:var(--black)}
+  .subtasks-panel{grid-column:1 / -1;margin-top:6px;padding:8px 4px 4px;border-top:1px dashed var(--grey-300);display:none}
+  .subtasks-panel.open{display:block}
+  .subtask-line{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:4px 6px;font-size:13px}
+  .subtask-line:hover{background:var(--grey-100)}
+  .subtask-line input[type="checkbox"]{width:16px;height:16px;cursor:pointer;accent-color:var(--black)}
+  .subtask-line .st-text.done{color:var(--grey-500);text-decoration:line-through}
+  .subtask-line .st-week{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;padding:1px 6px;border:1px solid var(--grey-300);color:var(--grey-700);background:var(--grey-100);white-space:nowrap}
+  /* Subtasks in modal */
+  .subtask-edit-row{display:grid;grid-template-columns:auto 1fr 120px auto;gap:6px;align-items:center;padding:4px 6px;border:1px solid var(--grey-200);margin-bottom:-1px;background:var(--white)}
+  .subtask-edit-row input[type="checkbox"]{width:16px;height:16px;accent-color:var(--black)}
+  .subtask-edit-row input[type="text"]{padding:5px 8px;font-size:13px;border:1px solid var(--grey-300)}
+  .subtask-add{display:grid;grid-template-columns:1fr 120px auto;gap:6px;margin-top:8px}
+  .subtask-add input{padding:6px 8px;font-size:13px;border:1px solid var(--black)}
+  /* Matrix */
+  .matrix-wrap{overflow-x:auto;border:1px solid var(--black)}
+  table.matrix{border-collapse:collapse;width:100%;font-size:13px;min-width:720px}
+  table.matrix th,table.matrix td{border:1px solid var(--grey-300);padding:10px;text-align:center;vertical-align:middle}
+  table.matrix thead th{background:var(--black);color:var(--white);font-family:'Antonio';text-transform:uppercase;letter-spacing:.08em;font-weight:700;font-size:12px}
+  table.matrix tbody th{background:var(--grey-100);text-align:left;font-family:'Antonio';text-transform:uppercase;letter-spacing:.06em;font-weight:700;font-size:13px;position:sticky;left:0;z-index:1}
+  .m-dot{display:inline-block;width:20px;height:20px;border-radius:50%;background:var(--grey-200)}
+  .m-dot.weight-1{background:var(--grey-300)}
+  .m-dot.weight-2{background:var(--bluette);opacity:.55}
+  .m-dot.weight-3{background:var(--bluette)}
+  .m-dot.weight-4{background:var(--black)}
+  .matrix-legend{display:flex;gap:16px;margin-top:10px;font-size:12px;color:var(--grey-700);flex-wrap:wrap}
+  .matrix-legend span{display:flex;align-items:center;gap:6px}
+  /* Timeline / Gantt */
+  .gantt{border:1px solid var(--black);overflow-x:auto}
+  .gantt-header{display:grid;grid-template-columns:280px 1fr;background:var(--grey-100);border-bottom:1px solid var(--black);font-family:'Antonio';text-transform:uppercase;letter-spacing:.08em;font-size:12px}
+  .gantt-header .left{padding:10px 14px;border-right:1px solid var(--black)}
+  .gantt-months{display:grid;grid-auto-flow:column;grid-auto-columns:1fr}
+  .gantt-month{padding:10px 8px;border-right:1px solid var(--grey-300);text-align:center}
+  .gantt-month:last-child{border-right:none}
+  .gantt-row{display:grid;grid-template-columns:280px 1fr;border-bottom:1px solid var(--grey-200);min-height:42px;cursor:pointer}
+  .gantt-row:hover{background:var(--grey-100)}
+  .gantt-row:last-child{border-bottom:none}
+  .gantt-row .left{padding:10px 14px;border-right:1px solid var(--grey-200);display:flex;align-items:center;gap:8px;font-size:13px}
+  .gantt-row .left .prio{flex:none}
+  .gantt-row .left .tname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gantt-lane{position:relative;background:repeating-linear-gradient(to right,transparent 0,transparent calc(100%/6 - 1px),var(--grey-200) calc(100%/6 - 1px),var(--grey-200) calc(100%/6))}
+  .gantt-bar{position:absolute;top:9px;height:24px;background:var(--lime);border:1.5px solid var(--black);display:flex;align-items:center;padding:0 8px;font-size:11px;font-family:'Antonio';letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;overflow:hidden}
+  .gantt-bar .fill{position:absolute;left:0;top:0;bottom:0;background:var(--bluette);opacity:.22}
+  .gantt-bar.p9,.gantt-bar.p10{background:var(--black);color:var(--white)}
+  .gantt-bar.p9 .fill,.gantt-bar.p10 .fill{background:var(--lime);opacity:.35}
+  .gantt-today{position:absolute;top:0;bottom:0;width:2px;background:var(--red);z-index:3;pointer-events:none}
+  .gantt-today::after{content:'OGGI';position:absolute;top:-18px;left:-18px;font-family:'Antonio';font-size:10px;color:var(--red);background:var(--white);padding:1px 4px;border:1px solid var(--red);letter-spacing:.08em}
+  /* Table view */
+  table.tasks{border-collapse:collapse;width:100%;font-size:13px}
+  table.tasks th,table.tasks td{border-bottom:1px solid var(--grey-200);padding:10px;text-align:left;vertical-align:top}
+  table.tasks thead th{background:var(--black);color:var(--white);font-family:'Antonio';text-transform:uppercase;letter-spacing:.08em;font-size:12px;position:sticky;top:0}
+  table.tasks tbody tr{cursor:pointer}
+  table.tasks tbody tr:hover{background:var(--grey-100)}
+  /* KPI */
+  .kpi{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px}
+  .kpi-card{border:1px solid var(--black);padding:10px 14px;min-width:140px}
+  .kpi-card .v{font-family:'Antonio';font-size:26px;line-height:1}
+  .kpi-card .l{font-size:11px;color:var(--grey-500);text-transform:uppercase;letter-spacing:.1em}
+  /* Modal */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+  .modal-backdrop.open{display:flex}
+  .modal{background:var(--white);border:2px solid var(--black);max-width:720px;width:100%;max-height:92vh;overflow:auto;display:flex;flex-direction:column}
+  .modal-head{padding:14px 18px;border-bottom:1px solid var(--black);display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--grey-100)}
+  .modal-head h3{font-size:18px}
+  .modal-body{padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .modal-body .full{grid-column:1 / -1}
+  .modal-foot{padding:12px 18px;border-top:1px solid var(--grey-200);display:flex;gap:8px;justify-content:space-between;background:var(--grey-100)}
+  .modal-foot .right{display:flex;gap:8px}
+  .field{display:flex;flex-direction:column;gap:4px}
+  .field label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--grey-700);font-weight:700}
+  .field input,.field select,.field textarea{font-family:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--black);background:var(--white);width:100%}
+  .field textarea{min-height:70px;resize:vertical;font-family:'Atkinson Hyperlegible'}
+  .field-hint{font-size:11px;color:var(--grey-500)}
+  .chip-input{display:flex;flex-wrap:wrap;gap:4px;border:1px solid var(--black);padding:6px;min-height:40px;background:var(--white)}
+  .chip-input .chip{display:inline-flex;align-items:center;gap:4px;background:var(--grey-100);padding:3px 8px;font-size:12px;border:1px solid var(--grey-300)}
+  .chip-input .chip button{background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0;line-height:1}
+  .chip-input input{border:none;outline:none;flex:1;min-width:120px;font-size:13px;padding:4px}
+  .obj-weight-row{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;padding:6px;border:1px solid var(--grey-200)}
+  .obj-weight-row + .obj-weight-row{border-top:none}
+  /* Login gate */
+  .login-gate{position:fixed;inset:0;background:var(--white);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+  .login-box{max-width:420px;width:100%;border:2px solid var(--black);padding:32px}
+  .login-box .brand-mark{justify-content:center;margin-bottom:20px}
+  .login-box h2{text-align:center;margin-bottom:8px}
+  .login-box p{text-align:center;color:var(--grey-700);font-size:13px;margin-bottom:20px}
+  .login-box .field{margin-bottom:12px}
+  .login-box .msg{font-size:13px;padding:10px;border:1px solid var(--grey-300);background:var(--grey-100);margin-top:12px;text-align:center}
+  .login-box .msg.ok{background:var(--lime);border-color:var(--black)}
+  .login-box .msg.err{background:#fff3f3;border-color:var(--red);color:var(--red)}
+  /* Loading overlay */
+  .loading{position:fixed;inset:0;background:rgba(255,255,255,.9);z-index:150;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+  .loading.on{display:flex}
+  .spinner{width:32px;height:32px;border:3px solid var(--grey-200);border-top-color:var(--black);border-radius:50%;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  /* Footer */
+  footer{margin-top:48px;padding:16px 32px;border-top:1px solid var(--grey-200);color:var(--grey-500);font-size:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .swatch{width:14px;height:14px;border:1px solid var(--black);display:inline-block}
+  .swatch.lime{background:var(--lime)} .swatch.bluette{background:var(--bluette)} .swatch.black{background:var(--black)} .swatch.white{background:var(--white)}
+  @media print{.filters,.tabs,.header-actions,.row-actions,.obj-actions,.stream-head-actions,.add-card,.add-task-row,.modal-backdrop,.login-gate,.loading{display:none!important}.view{display:block!important}main{padding:0}}
+  /* Mobile */
+  @media (max-width:720px){
+    header{padding:14px 16px;gap:10px}
+    .brand-mark{gap:10px}
+    .brand-logo{height:34px}
+    .brand-sub{font-size:10px;letter-spacing:.08em}
+    .header-actions{gap:6px;flex-wrap:wrap}
+    .header-meta{display:none}
+    main{padding:14px 14px 80px}
+    section{margin-top:22px}
+    .section-title{gap:8px;padding-bottom:6px}
+    .section-title h2{font-size:16px}
+    .section-title small{display:none}
+    .kpi{gap:8px}
+    .kpi-card{min-width:100px;padding:8px 10px;flex:1}
+    .kpi-card .v{font-size:20px}
+    .kpi-card .l{font-size:10px}
+    .obj-grid{grid-template-columns:1fr;gap:12px}
+    .obj-card{padding:14px}
+    .obj-card .title{font-size:18px}
+    .filters{padding:10px;gap:8px}
+    .filters label{width:100%;font-size:10px;flex-direction:column;align-items:stretch;gap:4px}
+    .filters select{min-width:0;width:100%}
+    .tabs{overflow-x:auto;flex-wrap:nowrap;white-space:nowrap}
+    .tab{padding:8px 12px;font-size:12px;flex:none}
+    .tree{grid-template-columns:1fr;gap:14px}
+    .tree-root{position:static}
+    .stream-head{padding:8px 10px;flex-wrap:wrap;gap:6px}
+    .stream-head h3{font-size:13px;flex:1 1 100%;order:-1}
+    .task-row{grid-template-columns:auto 1fr auto;gap:8px;padding:8px 6px}
+    .task-row .progress-mini{display:none}
+    .task-row .mono{display:none}
+    .task-row .row-actions{display:none}
+    .task-row .task-notes{font-size:11px;grid-column:2 / -1}
+    .task-name{font-size:13px}
+    .owner-chip{font-size:10px;padding:1px 5px}
+    .modal{max-height:95vh}
+    .modal-body{grid-template-columns:1fr;padding:14px;gap:10px}
+    .modal-foot{padding:10px 14px;flex-direction:column;gap:6px}
+    .modal-foot .right{width:100%;justify-content:space-between}
+    .modal-foot .btn{flex:1;font-size:11px}
+    .gantt-header,.gantt-row{grid-template-columns:140px 1fr}
+    .gantt-row .left{padding:8px 10px;font-size:12px}
+    table.tasks{font-size:12px}
+    table.tasks th,table.tasks td{padding:6px}
+    .btn{font-size:11px;padding:6px 10px}
+    .btn.small{font-size:10px;padding:4px 7px}
+    footer{padding:12px 16px;flex-direction:column;align-items:flex-start}
+  }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading" id="loading"><div class="spinner"></div><div style="font-family:'Antonio';letter-spacing:.1em;text-transform:uppercase;font-size:12px">Caricamento…</div></div>
+
+<header id="mainHeader">
+  <div class="brand-mark">
+    <img src="LOGO-BLACK.png" alt="Standard Football" class="brand-logo">
+    <div class="brand-sub">Tasks & Streams — Project Dashboard</div>
+  </div>
+  <div class="header-actions">
+    <span class="save-status" id="saveStatus"><span class="led"></span><span id="saveStatusText">Sincronizzato</span></span>
+    <span class="header-meta" id="today"></span>
+    <button class="btn small" onclick="exportData()">Export JSON</button>
+  </div>
+</header>
+
+<main id="mainContent">
+
+<section>
+  <div class="kpi" id="kpiRow"></div>
+</section>
+
+<section>
+  <div class="section-title">
+    <h2>Obiettivi strategici</h2>
+    <small>il "perché" — priorità di business</small>
+    <span class="spacer"></span>
+    <button class="btn small primary" onclick="openObjectiveEditor()">+ Nuovo obiettivo</button>
+  </div>
+  <div class="obj-grid" id="objGrid"></div>
+</section>
+
+<section>
+  <div class="section-title">
+    <h2>Streams & tasks</h2>
+    <small>il "cosa" — esecuzione</small>
+    <span class="spacer"></span>
+    <button class="btn small" onclick="openStreamEditor()">+ Nuovo stream</button>
+    <button class="btn small primary" onclick="openTaskEditor()">+ Nuovo task</button>
+  </div>
+  <div class="filters">
+    <label>Owner <select id="fOwner"><option value="">Tutti</option></select></label>
+    <label>Stream <select id="fStream"><option value="">Tutti</option></select></label>
+    <label>Obiettivo <select id="fObj"><option value="">Tutti</option></select></label>
+    <label>Priorità min
+      <select id="fPrio">
+        <option value="0">Qualsiasi</option>
+        <option value="3">≥ 3</option>
+        <option value="6">≥ 6</option>
+        <option value="8">≥ 8</option>
+        <option value="9">≥ 9</option>
+      </select>
+    </label>
+    <label>Stato
+      <select id="fStatus">
+        <option value="">Tutti</option>
+        <option>In corso</option>
+        <option>Backlog</option>
+        <option>In review</option>
+        <option>Done</option>
+      </select>
+    </label>
+    <span class="spacer"></span>
+    <button class="btn small" onclick="resetFilters()">Reset filtri</button>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-view="tree">Albero</div>
+    <div class="tab" data-view="matrix">Matrice Obiettivi × Streams</div>
+    <div class="tab" data-view="timeline">Timeline</div>
+    <div class="tab" data-view="table">Tabella</div>
+  </div>
+
+  <div class="view active" data-view="tree">
+    <div class="tree">
+      <div class="tree-root">
+        <div class="root-title">Standard Football</div>
+        <div class="root-sub">Data + algorithms — FIFA exclusive partner</div>
+        <p style="font-size:12px;color:var(--grey-700);margin:12px 0 0">SaaS B2B (club, leghe, fondi) + consumer. Dati proprietari su 29k+ giocatori, 1.000+ bilanci club auditati.</p>
+      </div>
+      <div id="streamList"></div>
+    </div>
+  </div>
+
+  <div class="view" data-view="matrix">
+    <div class="matrix-wrap"><table class="matrix" id="matrixTable"></table></div>
+    <div class="matrix-legend">
+      <span><i class="m-dot weight-1"></i> Contributo marginale</span>
+      <span><i class="m-dot weight-2"></i> Contributo medio</span>
+      <span><i class="m-dot weight-3"></i> Contributo forte</span>
+      <span><i class="m-dot weight-4"></i> Critico / bloccante</span>
+    </div>
+  </div>
+
+  <div class="view" data-view="timeline">
+    <div class="gantt" id="gantt"></div>
+    <div style="font-size:12px;color:var(--grey-500);margin-top:8px">Barra = intervallo task, riempimento interno = % completamento. Linea rossa = oggi. Click per modificare.</div>
+  </div>
+
+  <div class="view" data-view="table">
+    <table class="tasks">
+      <thead><tr><th>Priorità</th><th>Task</th><th>Stream</th><th>Owner</th><th>Stato</th><th>%</th><th>Inizio</th><th>Target</th><th>Obiettivi</th></tr></thead>
+      <tbody id="tasksTbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  <div class="legend">
+    <span><i class="swatch lime"></i> Lime = in corso</span>
+    <span><i class="swatch bluette"></i> Bluette = obiettivi strategici</span>
+    <span><i class="swatch black"></i> Nero = alta priorità (9-10)</span>
+  </div>
+  <div>Dati live su Supabase. Modifiche condivise in tempo reale tra tutti i membri loggati.</div>
+</footer>
+
+</main>
+
+<!-- MODAL -->
+<div class="modal-backdrop" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modalTitle">Modifica</h3><button class="btn icon" onclick="closeModal()">✕</button></div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot">
+      <button class="btn danger" id="modalDelete" onclick="deleteCurrent()">Elimina</button>
+      <div class="right">
+        <button class="btn" onclick="closeModal()">Annulla</button>
+        <button class="btn primary" id="modalSave" onclick="saveCurrent()">Salva</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG SUPABASE
+   ============================================================ */
+const SUPABASE_URL = "https://ifjbvvdweqasxebrbmjj.supabase.co";
+const SUPABASE_KEY = "sb_publishable_wZLQD3IykNcJjEzdS-oDJw_cBcqNHos";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ============================================================
+   STATO IN MEMORIA
+   ============================================================ */
+let DATA = {
+  today: new Date().toISOString().slice(0,10),
+  objectives: [],
+  streams: [],
+  tasks: []
+};
+
+/* ============================================================
+   MAPPING DB <-> JS
+   (DB: snake_case, JS: camelCase come prima)
+   ============================================================ */
+function rowToObjective(r){
+  return { id:r.id, title:r.title, desc:r.description||'', deadline:r.deadline||'',
+           progress:r.progress||0, accent:r.accent||'lime', urgent:!!r.urgent, sort_order:r.sort_order||0 };
+}
+function objectiveToRow(o){
+  return { id:o.id, title:o.title, description:o.desc||'', deadline:o.deadline||'',
+           progress:o.progress||0, accent:o.accent||'lime', urgent:!!o.urgent, sort_order:o.sort_order||0 };
+}
+function rowToStream(r){
+  return { id:r.id, name:r.name, desc:r.description||'', color:r.color||'lime', sort_order:r.sort_order||0 };
+}
+function streamToRow(s){
+  return { id:s.id, name:s.name, description:s.desc||'', color:s.color||'lime', sort_order:s.sort_order||0 };
+}
+function rowToTask(r){
+  return { id:r.id, name:r.name, stream:r.stream_id||'', priority:r.priority||5,
+           owners:r.owners||[], status:r.status||'Backlog', progress:r.progress||0,
+           start:r.start_date||'', end:r.end_date||'', notes:r.notes||'',
+           objectives:r.objectives||[], subtasks:r.subtasks||[], sort_order:r.sort_order||0 };
+}
+function taskToRow(t){
+  return { id:t.id, name:t.name, stream_id:t.stream||null, priority:t.priority||5,
+           owners:t.owners||[], status:t.status||'Backlog', progress:t.progress||0,
+           start_date:t.start||null, end_date:t.end||null, notes:t.notes||'',
+           objectives:t.objectives||[], subtasks:t.subtasks||[], sort_order:t.sort_order||0 };
+}
+
+/* ============================================================
+   UTIL
+   ============================================================ */
+const $ = (s,p=document)=>p.querySelector(s);
+const $$ = (s,p=document)=>Array.from(p.querySelectorAll(s));
+const fmtDate = d => { if(!d) return "—"; const [y,m,da]=d.split("-"); return `${da}/${m}/${y}`; };
+const shortDate = d => { if(!d) return "—"; const [y,m,da]=d.split("-"); return `${da}/${m.padStart(2,'0')}`; };
+const parseDate = d => new Date(d+"T00:00:00");
+const newId = prefix => prefix + "_" + Math.random().toString(36).slice(2,8);
+const escapeHtml = s => (s||"").toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function buildOwnersDatalist(excludeList){
+  const excluded = new Set(excludeList||[]);
+  const allOwners = Array.from(new Set(DATA.tasks.flatMap(t=>t.owners||[])))
+    .filter(o=>o && !excluded.has(o))
+    .sort((a,b)=>a.localeCompare(b));
+  return `<datalist id="owner_suggestions">${allOwners.map(o=>`<option value="${escapeHtml(o)}">`).join("")}</datalist>`;
+}
+function nextSortOrder(arr){
+  return (arr.reduce((m,x)=>Math.max(m,x.sort_order||0),0) + 10);
+}
+function setSaveStatus(state, text){
+  const s = $("#saveStatus");
+  s.classList.remove("saving","error");
+  if(state==="saving") s.classList.add("saving");
+  if(state==="error") s.classList.add("error");
+  $("#saveStatusText").textContent = text || (state==="saving"?"Sincronizzando…":state==="error"?"Errore sync":"Sincronizzato");
+}
+
+/* ============================================================
+   LOAD DATA + REALTIME
+   ============================================================ */
+async function loadData(){
+  setSaveStatus("saving","Caricamento…");
+  const [oRes, sRes, tRes] = await Promise.all([
+    sb.from("objectives").select("*").order("sort_order"),
+    sb.from("streams").select("*").order("sort_order"),
+    sb.from("tasks").select("*").order("sort_order")
+  ]);
+  if(oRes.error || sRes.error || tRes.error){
+    const err = oRes.error || sRes.error || tRes.error;
+    setSaveStatus("error","Errore caricamento");
+    alert("Errore nel caricamento dati: "+err.message+"\n\nControlla che le policy RLS siano configurate e che tu sia autenticato.");
+    throw err;
+  }
+  DATA.objectives = (oRes.data||[]).map(rowToObjective);
+  DATA.streams    = (sRes.data||[]).map(rowToStream);
+  DATA.tasks      = (tRes.data||[]).map(rowToTask);
+  DATA.today      = new Date().toISOString().slice(0,10);
+  setSaveStatus("ok","Sincronizzato");
+}
+
+function setupRealtime(){
+  sb.channel("dashboard-live")
+    .on("postgres_changes", { event:"*", schema:"public", table:"objectives" }, p=>handleRealtime("objectives",p))
+    .on("postgres_changes", { event:"*", schema:"public", table:"streams" },    p=>handleRealtime("streams",p))
+    .on("postgres_changes", { event:"*", schema:"public", table:"tasks" },      p=>handleRealtime("tasks",p))
+    .subscribe();
+}
+function handleRealtime(table, payload){
+  const { eventType, new:newRow, old:oldRow } = payload;
+  const arr = DATA[table];
+  if(eventType==="DELETE"){
+    const i = arr.findIndex(x=>x.id===oldRow.id);
+    if(i>=0) arr.splice(i,1);
+  } else {
+    const mapped = table==="tasks"?rowToTask(newRow):table==="objectives"?rowToObjective(newRow):rowToStream(newRow);
+    const i = arr.findIndex(x=>x.id===mapped.id);
+    if(i>=0) arr[i] = mapped;
+    else arr.push(mapped);
+  }
+  // keep arrays sorted by sort_order
+  arr.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+  renderAll();
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function renderKPI(){
+  const tasks = DATA.tasks, total = tasks.length || 1;
+  const today = parseDate(DATA.today);
+  const active = tasks.filter(t=>t.status==="In corso").length;
+  const backlog = tasks.filter(t=>t.status==="Backlog").length;
+  const critical = tasks.filter(t=>t.priority>=9).length;
+  const avgProg = Math.round(tasks.reduce((a,t)=>a+(+t.progress||0),0)/total);
+  const urgent = tasks.filter(t=>{
+    if(!t.end) return false;
+    const end = parseDate(t.end);
+    const days = (end-today)/86400000;
+    return days<=30 && days>=0 && t.status!=="Done";
+  }).length;
+  const kpis = [
+    {l:"Totale task",v:tasks.length},
+    {l:"In corso",v:active},
+    {l:"Backlog",v:backlog},
+    {l:"Priorità ≥9",v:critical},
+    {l:"Scad. ≤30gg",v:urgent},
+    {l:"Avanzam. medio",v:avgProg+"%"}
+  ];
+  $("#kpiRow").innerHTML = kpis.map(k=>`<div class="kpi-card"><div class="v mono">${k.v}</div><div class="l">${k.l}</div></div>`).join("");
+}
+
+function renderObjectives(){
+  const grid = $("#objGrid");
+  grid.innerHTML = DATA.objectives.map(o=>`
+    <div class="obj-card ${o.accent||'lime'}">
+      <span class="accent"></span>
+      <div class="obj-actions">
+        <button class="btn icon" title="Modifica" onclick="event.stopPropagation();openObjectiveEditor('${o.id}')">✎</button>
+      </div>
+      <h3>Obiettivo strategico</h3>
+      <div class="title">${escapeHtml(o.title)}</div>
+      <div class="desc">${escapeHtml(o.desc||"")}</div>
+      <div class="obj-meta">
+        <span class="deadline-badge ${o.urgent?'urgent':''}">Target: ${escapeHtml(o.deadline||'—')}</span>
+        <span class="mono">${o.progress||0}%</span>
+      </div>
+      <div class="progress"><span style="width:${Math.max(0,Math.min(100,+o.progress||0))}%"></span></div>
+    </div>
+  `).join("") + `<div class="obj-card add-card" onclick="openObjectiveEditor()">+ Nuovo obiettivo</div>`;
+}
+
+function fillFilters(){
+  const cur = {
+    owner:  $("#fOwner")  ? $("#fOwner").value  : "",
+    stream: $("#fStream") ? $("#fStream").value : "",
+    obj:    $("#fObj")    ? $("#fObj").value    : ""
+  };
+  const owners = Array.from(new Set(DATA.tasks.flatMap(t=>t.owners||[]))).sort();
+  $("#fOwner").innerHTML = `<option value="">Tutti</option>`+owners.map(o=>`<option>${escapeHtml(o)}</option>`).join("");
+  $("#fStream").innerHTML = `<option value="">Tutti</option>`+DATA.streams.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join("");
+  $("#fObj").innerHTML = `<option value="">Tutti</option>`+DATA.objectives.map(o=>`<option value="${o.id}">${escapeHtml(o.title)}</option>`).join("");
+  if(owners.includes(cur.owner)) $("#fOwner").value = cur.owner;
+  if(DATA.streams.some(s=>s.id===cur.stream)) $("#fStream").value = cur.stream;
+  if(DATA.objectives.some(o=>o.id===cur.obj)) $("#fObj").value = cur.obj;
+}
+
+function getFilteredTasks(){
+  const fo = $("#fOwner").value, fs = $("#fStream").value, fob = $("#fObj").value;
+  const fp = +$("#fPrio").value, fst = $("#fStatus").value;
+  return DATA.tasks.filter(t=>{
+    if(fo && !(t.owners||[]).includes(fo)) return false;
+    if(fs && t.stream!==fs) return false;
+    if(fob && !(t.objectives||[]).some(o=>o.obj===fob)) return false;
+    if(fp && (+t.priority||0)<fp) return false;
+    if(fst && t.status!==fst) return false;
+    return true;
+  });
+}
+
+function resetFilters(){
+  ["fOwner","fStream","fObj","fPrio","fStatus"].forEach(id=>$("#"+id).selectedIndex=0);
+  renderFilteredViews();
+}
+
+function renderTree(){
+  const tasks = getFilteredTasks();
+  $("#streamList").innerHTML = DATA.streams.map(s=>{
+    const sTasks = tasks.filter(t=>t.stream===s.id).sort((a,b)=>(+b.priority||0)-(+a.priority||0));
+    return `
+      <div class="stream-card">
+        <div class="stream-head">
+          <span class="dot" style="background:${s.color==='bluette'?'var(--bluette)':'var(--lime)'}"></span>
+          <h3 onclick="toggleStream(this)">${escapeHtml(s.name)}</h3>
+          <span class="count mono">${sTasks.length} task</span>
+          <span class="chev" onclick="toggleStream(this.parentElement.querySelector('h3'))">▾</span>
+          <div class="stream-head-actions">
+            <button class="btn icon" title="Modifica stream" onclick="openStreamEditor('${s.id}')">✎</button>
+            <button class="btn icon" title="Aggiungi task" onclick="openTaskEditor(null,'${s.id}')">+</button>
+          </div>
+        </div>
+        <div class="stream-body">
+          ${sTasks.length===0?'<div style="padding:8px;color:var(--grey-500);font-size:12px">Nessun task in questo stream con i filtri attuali.</div>':
+            sTasks.map(t=>taskRowHtml(t)).join("")}
+          <div class="add-task-row"><button class="btn small" onclick="openTaskEditor(null,'${s.id}')">+ Aggiungi task a questo stream</button></div>
+        </div>
+      </div>`;
+  }).join("");
+}
+function toggleStream(h3){
+  const body = h3.closest(".stream-card").querySelector(".stream-body");
+  const chev = h3.closest(".stream-head").querySelector(".chev");
+  body.classList.toggle("collapsed");
+  chev.textContent = body.classList.contains("collapsed")?"▸":"▾";
+}
+function taskRowHtml(t){
+  const statusClass = t.status==="In corso"?"corso":t.status==="Backlog"?"backlog":t.status==="In review"?"review":"done";
+  const subs = t.subtasks||[];
+  const subDone = subs.filter(s=>s.done).length;
+  const subTotal = subs.length;
+  const allDone = subTotal>0 && subDone===subTotal;
+  const subBadge = subTotal>0
+    ? `<span class="sub-badge mono ${allDone?'all-done':''}" title="${subDone} completate su ${subTotal}">${subDone}/${subTotal}</span>
+       <button class="sub-chev" onclick="event.stopPropagation();togglePanel('${t.id}')" title="Mostra sotto-task">▾</button>`
+    : '';
+  const subLines = subs.map(s=>`
+    <div class="subtask-line" onclick="event.stopPropagation()">
+      <input type="checkbox" ${s.done?'checked':''} onchange="toggleSubtaskDone('${t.id}','${s.id}',this.checked)">
+      <span class="st-text ${s.done?'done':''}">${escapeHtml(s.text||"")}</span>
+      ${s.week?`<span class="st-week">${escapeHtml(s.week)}</span>`:'<span></span>'}
+    </div>`).join("");
+  return `
+    <div class="task-row" onclick="openTaskEditor('${t.id}')">
+      <span class="prio p${t.priority}">${t.priority}</span>
+      <div>
+        <div class="task-name">${escapeHtml(t.name)}</div>
+        <div class="task-owners" style="margin-top:4px">
+          ${(t.owners||[]).map(o=>`<span class="owner-chip">${escapeHtml(o)}</span>`).join("")}
+        </div>
+      </div>
+      <span class="status-chip ${statusClass}">${escapeHtml(t.status)}</span>
+      <div class="progress-mini" title="${t.progress}% completato"><span style="width:${Math.max(0,Math.min(100,+t.progress||0))}%"></span></div>
+      <span class="mono" style="font-size:12px">${shortDate(t.end)}${subBadge}</span>
+      <div class="row-actions"><button class="btn icon" title="Modifica" onclick="event.stopPropagation();openTaskEditor('${t.id}')">✎</button></div>
+      <div class="task-notes">${escapeHtml(t.notes||"")}</div>
+      ${subTotal>0?`<div class="subtasks-panel" id="sub_${t.id}">${subLines}</div>`:''}
+    </div>`;
+}
+function togglePanel(taskId){
+  const panel = document.getElementById("sub_"+taskId);
+  if(panel) panel.classList.toggle("open");
+}
+async function toggleSubtaskDone(taskId, subId, done){
+  const task = DATA.tasks.find(t=>t.id===taskId);
+  if(!task) return;
+  const sub = (task.subtasks||[]).find(s=>s.id===subId);
+  if(!sub) return;
+  sub.done = done;
+  setSaveStatus("saving");
+  try{
+    const { error } = await sb.from("tasks").update({ subtasks: task.subtasks }).eq("id", taskId);
+    if(error) throw error;
+    setSaveStatus("ok");
+    // re-render per aggiornare badge/progress
+    renderFilteredViews();
+  }catch(e){
+    sub.done = !done;
+    setSaveStatus("error");
+    alert("Errore salvataggio sotto-task: "+(e.message||e));
+  }
+}
+
+function renderMatrix(){
+  const tasks = getFilteredTasks();
+  const {streams, objectives} = DATA;
+  const cellWeight = {}, cellTasks = {};
+  objectives.forEach(o=>streams.forEach(s=>{ cellWeight[o.id+"|"+s.id]=0; cellTasks[o.id+"|"+s.id]=[]; }));
+  tasks.forEach(t=>{
+    (t.objectives||[]).forEach(link=>{
+      const key = link.obj+"|"+t.stream;
+      if(cellWeight[key]!==undefined){
+        cellWeight[key] = Math.max(cellWeight[key], link.weight);
+        cellTasks[key].push(t.name+" ("+t.priority+")");
+      }
+    });
+  });
+  let html = "<thead><tr><th style='text-align:left'>Obiettivo ↓ / Stream →</th>";
+  streams.forEach(s=>{ html+=`<th>${escapeHtml(s.name)}</th>`; });
+  html += "</tr></thead><tbody>";
+  objectives.forEach(o=>{
+    html+=`<tr><th>${escapeHtml(o.title)}</th>`;
+    streams.forEach(s=>{
+      const w = cellWeight[o.id+"|"+s.id], ts = cellTasks[o.id+"|"+s.id];
+      html += `<td title="${escapeHtml(ts.join(' • ')||'—')}">${w>0?`<span class="m-dot weight-${w}"></span>`:'<span style="color:var(--grey-300)">—</span>'}</td>`;
+    });
+    html+="</tr>";
+  });
+  html+="</tbody>";
+  $("#matrixTable").innerHTML = html;
+}
+
+function renderGantt(){
+  const tasks = getFilteredTasks().slice().filter(t=>t.start&&t.end).sort((a,b)=>parseDate(a.start)-parseDate(b.start));
+  if(tasks.length===0){ $("#gantt").innerHTML = '<div style="padding:20px;color:var(--grey-500)">Nessun task con date con i filtri attuali.</div>'; return; }
+  let minD = new Date("2099-01-01"), maxD = new Date("1970-01-01");
+  tasks.forEach(t=>{
+    const s = parseDate(t.start), e = parseDate(t.end);
+    if(s<minD) minD = s;
+    if(e>maxD) maxD = e;
+  });
+  minD = new Date(minD.getFullYear(), minD.getMonth(), 1);
+  maxD = new Date(maxD.getFullYear(), maxD.getMonth()+1, 0);
+  const months=[]; let d = new Date(minD);
+  while(d<=maxD){ months.push(new Date(d)); d = new Date(d.getFullYear(), d.getMonth()+1, 1); }
+  const totalMs = maxD - minD;
+  const pct = ms => (ms/totalMs)*100;
+  const monthsHtml = months.map(m=>`<div class="gantt-month">${m.toLocaleString('it-IT',{month:'short'}).toUpperCase()} '${String(m.getFullYear()).slice(2)}</div>`).join("");
+  const header = `<div class="gantt-header"><div class="left">Task</div><div class="gantt-months" style="grid-template-columns:repeat(${months.length},1fr)">${monthsHtml}</div></div>`;
+  const rows = tasks.map(t=>{
+    const s = parseDate(t.start), e = parseDate(t.end);
+    const left = pct(s-minD), width = Math.max(pct(e-s), 1);
+    return `<div class="gantt-row" onclick="openTaskEditor('${t.id}')">
+      <div class="left"><span class="prio p${t.priority}">${t.priority}</span><span class="tname" title="${escapeHtml(t.name)}">${escapeHtml(t.name)}</span></div>
+      <div class="gantt-lane" style="position:relative">
+        <div class="gantt-bar p${t.priority}" style="left:${left}%;width:${width}%" title="${escapeHtml(t.name)} — ${fmtDate(t.start)} → ${fmtDate(t.end)} (${t.progress}%)">
+          <div class="fill" style="width:${Math.max(0,Math.min(100,+t.progress||0))}%"></div>
+          <span style="position:relative;z-index:2">${t.progress||0}%</span>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+  const today = parseDate(DATA.today);
+  const todayPct = pct(today - minD);
+  const todayMarker = (today>=minD && today<=maxD) ? `<div class="gantt-today" style="left:calc(280px + (100% - 280px) * ${todayPct/100})"></div>` : '';
+  $("#gantt").innerHTML = `<div style="position:relative">${header}${rows}${todayMarker}</div>`;
+}
+
+function renderTable(){
+  const tasks = getFilteredTasks().slice().sort((a,b)=>(+b.priority||0)-(+a.priority||0));
+  $("#tasksTbody").innerHTML = tasks.map(t=>{
+    const streamName = (DATA.streams.find(s=>s.id===t.stream)||{}).name || '—';
+    const objNames = (t.objectives||[]).map(l=>{
+      const o = DATA.objectives.find(x=>x.id===l.obj);
+      return o?o.title:l.obj;
+    }).join(", ");
+    const statusClass = t.status==="In corso"?"corso":t.status==="Backlog"?"backlog":t.status==="In review"?"review":"done";
+    return `<tr onclick="openTaskEditor('${t.id}')">
+      <td><span class="prio p${t.priority}">${t.priority}</span></td>
+      <td><strong>${escapeHtml(t.name)}</strong><div style="font-size:12px;color:var(--grey-500)">${escapeHtml(t.notes||"")}</div></td>
+      <td>${escapeHtml(streamName)}</td>
+      <td>${(t.owners||[]).map(o=>`<span class="owner-chip">${escapeHtml(o)}</span>`).join(" ")}</td>
+      <td><span class="status-chip ${statusClass}">${escapeHtml(t.status)}</span></td>
+      <td class="mono">${t.progress||0}%</td>
+      <td class="mono">${shortDate(t.start)}</td>
+      <td class="mono">${shortDate(t.end)}</td>
+      <td style="font-size:12px">${escapeHtml(objNames)}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderFilteredViews(){
+  renderTree(); renderMatrix(); renderGantt(); renderTable();
+}
+function renderAll(){
+  fillFilters();
+  renderKPI();
+  renderObjectives();
+  renderFilteredViews();
+  $("#today").textContent = "Aggiornato: "+fmtDate(DATA.today);
+}
+
+/* ============================================================
+   MODAL / CRUD
+   ============================================================ */
+let modalMode = null, modalEntityId = null, modalPrefill = null;
+function openModal(title, bodyHtml, showDelete){
+  $("#modalTitle").textContent = title;
+  $("#modalBody").innerHTML = bodyHtml;
+  $("#modalDelete").style.display = showDelete ? "" : "none";
+  $("#modal").classList.add("open");
+}
+function closeModal(){
+  $("#modal").classList.remove("open");
+  modalMode = null; modalEntityId = null; modalPrefill = null;
+  delete DATA._edit;
+}
+
+function openTaskEditor(taskId, streamIdPrefill){
+  modalMode = "task"; modalEntityId = taskId;
+  modalPrefill = { stream: streamIdPrefill };
+  const t = taskId ? DATA.tasks.find(x=>x.id===taskId) : {
+    id:null, name:"", stream: streamIdPrefill || (DATA.streams[0]?.id || ""), priority:5,
+    owners:[], status:"Backlog", progress:0, start:"", end:"",
+    notes:"", objectives:[], subtasks:[]
+  };
+  DATA._edit = JSON.parse(JSON.stringify(t));
+  const streamOpts = DATA.streams.map(s=>`<option value="${s.id}" ${s.id===t.stream?'selected':''}>${escapeHtml(s.name)}</option>`).join("");
+  const statusOpts = ["Backlog","In corso","In review","Done"].map(s=>`<option ${s===t.status?'selected':''}>${s}</option>`).join("");
+  const prioOpts = [1,2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}" ${+t.priority===n?'selected':''}>${n}</option>`).join("");
+  const ownerChips = (t.owners||[]).map((o,i)=>`<span class="chip">${escapeHtml(o)}<button type="button" onclick="removeChip('owner',${i})">×</button></span>`).join("");
+  const objRows = (t.objectives||[]).map((link,i)=>{
+    const opts = DATA.objectives.map(o=>`<option value="${o.id}" ${o.id===link.obj?'selected':''}>${escapeHtml(o.title)}</option>`).join("");
+    return `<div class="obj-weight-row">
+      <select onchange="DATA._edit.objectives[${i}].obj=this.value">${opts}</select>
+      <select onchange="DATA._edit.objectives[${i}].weight=+this.value">
+        ${[1,2,3,4].map(w=>`<option value="${w}" ${+link.weight===w?'selected':''}>${['Marginale','Medio','Forte','Critico'][w-1]}</option>`).join("")}
+      </select>
+      <button type="button" class="btn icon danger" onclick="removeChip('objective',${i})">✕</button>
+    </div>`;
+  }).join("");
+  const objSelectOpts = DATA.objectives.map(o=>`<option value="${o.id}">${escapeHtml(o.title)}</option>`).join("");
+  openModal(taskId?"Modifica task":"Nuovo task", `
+    <div class="field full"><label>Nome task</label><input id="f_name" value="${escapeHtml(t.name)}"></div>
+    <div class="field"><label>Stream</label><select id="f_stream">${streamOpts}</select></div>
+    <div class="field"><label>Priorità (1-10)</label><select id="f_priority">${prioOpts}</select></div>
+    <div class="field"><label>Stato</label><select id="f_status">${statusOpts}</select></div>
+    <div class="field"><label>% completamento</label><input id="f_progress" type="number" min="0" max="100" step="5" value="${t.progress||0}"></div>
+    <div class="field"><label>Data inizio</label><input id="f_start" type="date" value="${t.start||''}"></div>
+    <div class="field"><label>Data target</label><input id="f_end" type="date" value="${t.end||''}"></div>
+    <div class="field full">
+      <label>Owner (scegli dall'elenco o scrivi un nome nuovo, poi premi Invio)</label>
+      <div class="chip-input" id="f_owners_chips">${ownerChips}<input id="f_owners_input" list="owner_suggestions" placeholder="Inizia a scrivere o clicca per vedere i suggerimenti…" onkeydown="if(event.key==='Enter'){event.preventDefault();addChip('owner',this.value);this.value=''}">${buildOwnersDatalist(t.owners)}</div>
+    </div>
+    <div class="field full"><label>Note</label><textarea id="f_notes">${escapeHtml(t.notes||"")}</textarea></div>
+    <div class="field full">
+      <label>Obiettivi collegati (con peso)</label>
+      <div id="f_objectives_list">${objRows||'<div class="field-hint">Nessun obiettivo collegato.</div>'}</div>
+      <div style="margin-top:8px;display:flex;gap:6px">
+        <select id="f_obj_new">${objSelectOpts}</select>
+        <button type="button" class="btn small" onclick="addChip('objective')">+ Aggiungi obiettivo</button>
+      </div>
+    </div>
+    <div class="field full">
+      <label>Sotto-task settimanali</label>
+      <div class="field-hint" style="margin-bottom:6px">Checkbox = fatto. Il campo "settimana" è libero (es. "W17", "Apr 20-26", "questa sett."). Si salva al click su Salva.</div>
+      <div id="f_subtasks_list">${renderSubtaskEditRows(t.subtasks||[])}</div>
+      <div class="subtask-add">
+        <input type="text" id="f_sub_new_text" placeholder="Nuova sotto-task…" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubtaskEdit()}">
+        <input type="text" id="f_sub_new_week" placeholder="Settimana (opt)">
+        <button type="button" class="btn small primary" onclick="addSubtaskEdit()">+ Aggiungi</button>
+      </div>
+    </div>
+  `, !!taskId);
+}
+function renderSubtaskEditRows(subtasks){
+  if(!subtasks || subtasks.length===0) return '<div class="field-hint">Nessuna sotto-task.</div>';
+  return subtasks.map((s,i)=>`
+    <div class="subtask-edit-row">
+      <input type="checkbox" ${s.done?'checked':''} onchange="DATA._edit.subtasks[${i}].done=this.checked">
+      <input type="text" value="${escapeHtml(s.text||'')}" onchange="DATA._edit.subtasks[${i}].text=this.value" placeholder="Testo sotto-task">
+      <input type="text" value="${escapeHtml(s.week||'')}" onchange="DATA._edit.subtasks[${i}].week=this.value" placeholder="W..">
+      <button type="button" class="btn icon danger" onclick="removeSubtaskEdit(${i})" title="Elimina">✕</button>
+    </div>`).join("");
+}
+function addSubtaskEdit(){
+  const text = ($("#f_sub_new_text").value||"").trim();
+  if(!text) return;
+  const week = ($("#f_sub_new_week").value||"").trim();
+  DATA._edit.subtasks = DATA._edit.subtasks || [];
+  DATA._edit.subtasks.push({ id:newId("st"), text, done:false, week });
+  $("#f_sub_new_text").value = "";
+  $("#f_sub_new_week").value = "";
+  $("#f_subtasks_list").innerHTML = renderSubtaskEditRows(DATA._edit.subtasks);
+  $("#f_sub_new_text").focus();
+}
+function removeSubtaskEdit(i){
+  DATA._edit.subtasks.splice(i,1);
+  $("#f_subtasks_list").innerHTML = renderSubtaskEditRows(DATA._edit.subtasks);
+}
+function addChip(type, valueOverride){
+  if(type==="owner"){
+    const v = (valueOverride||"").trim();
+    if(!v) return;
+    DATA._edit.owners = DATA._edit.owners || [];
+    DATA._edit.owners.push(v);
+    refreshChipInputs();
+  } else if(type==="objective"){
+    const sel = $("#f_obj_new");
+    const obj = sel?sel.value:DATA.objectives[0]?.id;
+    if(!obj) return;
+    DATA._edit.objectives = DATA._edit.objectives || [];
+    if(DATA._edit.objectives.some(l=>l.obj===obj)){ alert("Obiettivo già collegato."); return; }
+    DATA._edit.objectives.push({obj, weight:3});
+    refreshChipInputs();
+  }
+}
+function removeChip(type, i){
+  if(type==="owner"){ DATA._edit.owners.splice(i,1); refreshChipInputs(); }
+  else if(type==="objective"){ DATA._edit.objectives.splice(i,1); refreshChipInputs(); }
+}
+function refreshChipInputs(){
+  if(modalMode!=="task") return;
+  const ownerHtml = (DATA._edit.owners||[]).map((o,i)=>`<span class="chip">${escapeHtml(o)}<button type="button" onclick="removeChip('owner',${i})">×</button></span>`).join("");
+  $("#f_owners_chips").innerHTML = ownerHtml + `<input id="f_owners_input" list="owner_suggestions" placeholder="Inizia a scrivere o clicca per vedere i suggerimenti…" onkeydown="if(event.key==='Enter'){event.preventDefault();addChip('owner',this.value);this.value=''}">` + buildOwnersDatalist(DATA._edit.owners);
+  const objRows = (DATA._edit.objectives||[]).map((link,i)=>{
+    const opts = DATA.objectives.map(o=>`<option value="${o.id}" ${o.id===link.obj?'selected':''}>${escapeHtml(o.title)}</option>`).join("");
+    return `<div class="obj-weight-row">
+      <select onchange="DATA._edit.objectives[${i}].obj=this.value">${opts}</select>
+      <select onchange="DATA._edit.objectives[${i}].weight=+this.value">${[1,2,3,4].map(w=>`<option value="${w}" ${+link.weight===w?'selected':''}>${['Marginale','Medio','Forte','Critico'][w-1]}</option>`).join("")}</select>
+      <button type="button" class="btn icon danger" onclick="removeChip('objective',${i})">✕</button>
+    </div>`;
+  }).join("");
+  $("#f_objectives_list").innerHTML = objRows || '<div class="field-hint">Nessun obiettivo collegato.</div>';
+}
+
+function openObjectiveEditor(objId){
+  modalMode = "objective"; modalEntityId = objId;
+  const o = objId ? DATA.objectives.find(x=>x.id===objId) : { id:null, title:"", desc:"", deadline:"", progress:0, accent:"lime", urgent:false };
+  DATA._edit = JSON.parse(JSON.stringify(o));
+  openModal(objId?"Modifica obiettivo":"Nuovo obiettivo", `
+    <div class="field full"><label>Titolo</label><input id="f_title" value="${escapeHtml(o.title)}"></div>
+    <div class="field full"><label>Descrizione</label><textarea id="f_desc">${escapeHtml(o.desc||"")}</textarea></div>
+    <div class="field"><label>Deadline (testo libero o YYYY-MM-DD)</label><input id="f_deadline" value="${escapeHtml(o.deadline||"")}" placeholder="es. 2026-05-20 o 2026-Q3"></div>
+    <div class="field"><label>% progress</label><input id="f_progress" type="number" min="0" max="100" step="5" value="${o.progress||0}"></div>
+    <div class="field"><label>Colore accento</label>
+      <select id="f_accent">
+        <option value="lime" ${o.accent==='lime'?'selected':''}>Lime</option>
+        <option value="bluette" ${o.accent==='bluette'?'selected':''}>Bluette</option>
+      </select>
+    </div>
+    <div class="field"><label>Urgente</label>
+      <select id="f_urgent"><option value="false" ${!o.urgent?'selected':''}>No</option><option value="true" ${o.urgent?'selected':''}>Sì</option></select>
+    </div>
+  `, !!objId);
+}
+function openStreamEditor(streamId){
+  modalMode = "stream"; modalEntityId = streamId;
+  const s = streamId ? DATA.streams.find(x=>x.id===streamId) : { id:null, name:"", desc:"", color:"lime" };
+  DATA._edit = JSON.parse(JSON.stringify(s));
+  openModal(streamId?"Modifica stream":"Nuovo stream", `
+    <div class="field full"><label>Nome stream</label><input id="f_name" value="${escapeHtml(s.name)}"></div>
+    <div class="field full"><label>Descrizione</label><textarea id="f_desc">${escapeHtml(s.desc||"")}</textarea></div>
+    <div class="field"><label>Colore</label>
+      <select id="f_color">
+        <option value="lime" ${s.color==='lime'?'selected':''}>Lime</option>
+        <option value="bluette" ${s.color==='bluette'?'selected':''}>Bluette</option>
+      </select>
+    </div>
+  `, !!streamId);
+}
+
+async function saveCurrent(){
+  $("#modalSave").disabled = true;
+  setSaveStatus("saving");
+  try{
+    if(modalMode==="task"){
+      const name = $("#f_name").value.trim();
+      if(!name) throw new Error("Il nome del task è obbligatorio.");
+      const payload = {
+        id: modalEntityId || newId("t"),
+        name,
+        stream: $("#f_stream").value,
+        priority: +$("#f_priority").value,
+        owners: DATA._edit.owners || [],
+        status: $("#f_status").value,
+        progress: Math.max(0, Math.min(100, +$("#f_progress").value||0)),
+        start: $("#f_start").value || "",
+        end: $("#f_end").value || "",
+        notes: $("#f_notes").value,
+        objectives: DATA._edit.objectives || [],
+        subtasks: DATA._edit.subtasks || [],
+        sort_order: modalEntityId
+          ? (DATA.tasks.find(x=>x.id===modalEntityId)?.sort_order || 0)
+          : nextSortOrder(DATA.tasks)
+      };
+      const row = taskToRow(payload);
+      const { error } = modalEntityId
+        ? await sb.from("tasks").update(row).eq("id", modalEntityId)
+        : await sb.from("tasks").insert(row);
+      if(error) throw error;
+    } else if(modalMode==="objective"){
+      const title = $("#f_title").value.trim();
+      if(!title) throw new Error("Il titolo è obbligatorio.");
+      const payload = {
+        id: modalEntityId || newId("obj"),
+        title,
+        desc: $("#f_desc").value,
+        deadline: $("#f_deadline").value,
+        progress: Math.max(0,Math.min(100,+$("#f_progress").value||0)),
+        accent: $("#f_accent").value,
+        urgent: $("#f_urgent").value==="true",
+        sort_order: modalEntityId
+          ? (DATA.objectives.find(x=>x.id===modalEntityId)?.sort_order || 0)
+          : nextSortOrder(DATA.objectives)
+      };
+      const row = objectiveToRow(payload);
+      const { error } = modalEntityId
+        ? await sb.from("objectives").update(row).eq("id", modalEntityId)
+        : await sb.from("objectives").insert(row);
+      if(error) throw error;
+    } else if(modalMode==="stream"){
+      const name = $("#f_name").value.trim();
+      if(!name) throw new Error("Il nome dello stream è obbligatorio.");
+      const payload = {
+        id: modalEntityId || newId("s"),
+        name,
+        desc: $("#f_desc").value,
+        color: $("#f_color").value,
+        sort_order: modalEntityId
+          ? (DATA.streams.find(x=>x.id===modalEntityId)?.sort_order || 0)
+          : nextSortOrder(DATA.streams)
+      };
+      const row = streamToRow(payload);
+      const { error } = modalEntityId
+        ? await sb.from("streams").update(row).eq("id", modalEntityId)
+        : await sb.from("streams").insert(row);
+      if(error) throw error;
+    }
+    setSaveStatus("ok");
+    closeModal();
+    // realtime si occuperà del re-render; forziamo anche qui per UX immediata
+    await loadData();
+    renderAll();
+  }catch(e){
+    setSaveStatus("error");
+    alert("Errore: "+(e.message||e));
+  }finally{
+    $("#modalSave").disabled = false;
+  }
+}
+
+async function deleteCurrent(){
+  if(!modalEntityId) return;
+  let msg = "Eliminare questo elemento?";
+  if(modalMode==="objective") msg = "Eliminare questo obiettivo? I task collegati perderanno il riferimento.";
+  if(modalMode==="stream"){
+    const tasksInStream = DATA.tasks.filter(t=>t.stream===modalEntityId).length;
+    if(tasksInStream>0){ alert(`Non puoi eliminare questo stream: contiene ${tasksInStream} task. Spostali o eliminali prima.`); return; }
+  }
+  if(!confirm(msg)) return;
+  $("#modalDelete").disabled = true;
+  setSaveStatus("saving");
+  try{
+    let error;
+    if(modalMode==="task")      ({ error } = await sb.from("tasks").delete().eq("id", modalEntityId));
+    else if(modalMode==="objective"){
+      // prima rimuovi l'obiettivo dai tasks
+      const linkedTasks = DATA.tasks.filter(t=>(t.objectives||[]).some(l=>l.obj===modalEntityId));
+      for(const t of linkedTasks){
+        const newObjs = t.objectives.filter(l=>l.obj!==modalEntityId);
+        const { error:upErr } = await sb.from("tasks").update({ objectives:newObjs }).eq("id", t.id);
+        if(upErr) throw upErr;
+      }
+      ({ error } = await sb.from("objectives").delete().eq("id", modalEntityId));
+    }
+    else if(modalMode==="stream") ({ error } = await sb.from("streams").delete().eq("id", modalEntityId));
+    if(error) throw error;
+    setSaveStatus("ok");
+    closeModal();
+    await loadData();
+    renderAll();
+  }catch(e){
+    setSaveStatus("error");
+    alert("Errore: "+(e.message||e));
+  }finally{
+    $("#modalDelete").disabled = false;
+  }
+}
+
+/* ============================================================
+   EXPORT (backup)
+   ============================================================ */
+function exportData(){
+  const snapshot = {
+    exported_at: new Date().toISOString(),
+    today: DATA.today,
+    objectives: DATA.objectives,
+    streams: DATA.streams,
+    tasks: DATA.tasks
+  };
+  const blob = new Blob([JSON.stringify(snapshot, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `sf_dashboard_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+async function bootstrap(){
+  $("#loading").classList.add("on");
+  try{
+    await loadData();
+    setupRealtime();
+    renderAll();
+  }catch(e){
+    console.error(e);
+  }finally{
+    $("#loading").classList.remove("on");
+  }
+}
+
+// Tabs
+$$(".tab").forEach(tab=>{
+  tab.addEventListener("click",()=>{
+    $$(".tab").forEach(t=>t.classList.remove("active"));
+    $$(".view").forEach(v=>v.classList.remove("active"));
+    tab.classList.add("active");
+    $(`.view[data-view="${tab.dataset.view}"]`).classList.add("active");
+  });
+});
+// Filters
+["fOwner","fStream","fObj","fPrio","fStatus"].forEach(id=>{
+  $("#"+id).addEventListener("change",renderFilteredViews);
+});
+// Modal keyboard
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeModal(); });
+
+bootstrap();
+</script>
+</body>
+</html>
