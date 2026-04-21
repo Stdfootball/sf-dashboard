@@ -133,11 +133,31 @@
   .subtask-line .st-text.done{color:var(--grey-500);text-decoration:line-through}
   .subtask-line .st-week{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;padding:1px 6px;border:1px solid var(--grey-300);color:var(--grey-700);background:var(--grey-100);white-space:nowrap}
   /* Subtasks in modal */
-  .subtask-edit-row{display:grid;grid-template-columns:auto 1fr 120px auto;gap:6px;align-items:center;padding:4px 6px;border:1px solid var(--grey-200);margin-bottom:-1px;background:var(--white)}
+  .subtask-edit-row{display:grid;grid-template-columns:auto 1fr 130px 150px auto;gap:6px;align-items:center;padding:4px 6px;border:1px solid var(--grey-200);margin-bottom:-1px;background:var(--white)}
   .subtask-edit-row input[type="checkbox"]{width:16px;height:16px;accent-color:var(--black)}
-  .subtask-edit-row input[type="text"]{padding:5px 8px;font-size:13px;border:1px solid var(--grey-300)}
-  .subtask-add{display:grid;grid-template-columns:1fr 120px auto;gap:6px;margin-top:8px}
-  .subtask-add input{padding:6px 8px;font-size:13px;border:1px solid var(--black)}
+  .subtask-edit-row input[type="text"], .subtask-edit-row select{padding:5px 8px;font-size:13px;border:1px solid var(--grey-300)}
+  .subtask-add{display:grid;grid-template-columns:1fr 130px 150px auto;gap:6px;margin-top:8px}
+  .subtask-add input, .subtask-add select{padding:6px 8px;font-size:13px;border:1px solid var(--black)}
+  .subtask-line .st-owner{font-size:10px;padding:1px 5px;border:1px solid var(--grey-500);color:var(--grey-700);background:var(--white);white-space:nowrap}
+  /* Weekly view */
+  .weekly-scroll{overflow-x:auto;border:1px solid var(--black);background:var(--grey-100)}
+  .weekly-grid{display:grid;grid-auto-flow:column;grid-auto-columns:260px;gap:0;min-height:420px}
+  .week-col{background:var(--grey-100);border-right:1px solid var(--grey-300);display:flex;flex-direction:column}
+  .week-col:last-child{border-right:none}
+  .week-col h4{padding:10px 12px;border-bottom:1px solid var(--black);background:var(--black);color:var(--white);font-family:'Antonio';font-size:13px;letter-spacing:.08em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+  .week-col.this-week h4{background:var(--lime);color:var(--black)}
+  .week-col.overdue h4{background:var(--red);color:var(--white)}
+  .week-col h4 .count{font-family:ui-monospace,monospace;font-size:12px;opacity:.7}
+  .week-col-body{padding:8px;flex:1;overflow-y:auto}
+  .weekly-card{background:var(--white);border:1px solid var(--grey-300);padding:8px 10px;margin-bottom:6px;cursor:pointer;display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start}
+  .weekly-card:hover{border-color:var(--black);box-shadow:0 1px 0 rgba(0,0,0,.08)}
+  .weekly-card.done{opacity:.55}
+  .weekly-card.done .wt-text{text-decoration:line-through;color:var(--grey-500)}
+  .weekly-card input[type="checkbox"]{margin-top:3px;accent-color:var(--black);width:16px;height:16px;cursor:pointer}
+  .wt-text{font-size:13px;font-weight:700;line-height:1.3}
+  .wt-meta{font-size:10px;color:var(--grey-500);margin-top:5px;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+  .wt-parent{font-style:italic;color:var(--grey-700)}
+  .weekly-empty{padding:14px 10px;font-size:12px;color:var(--grey-500);text-align:center;font-style:italic}
   /* Matrix */
   .matrix-wrap{overflow-x:auto;border:1px solid var(--black)}
   table.matrix{border-collapse:collapse;width:100%;font-size:13px;min-width:720px}
@@ -345,6 +365,7 @@
 
   <div class="tabs" id="tabs">
     <div class="tab active" data-view="tree">Albero</div>
+    <div class="tab" data-view="weekly">Settimana</div>
     <div class="tab" data-view="matrix">Matrice Obiettivi × Streams</div>
     <div class="tab" data-view="timeline">Timeline</div>
     <div class="tab" data-view="table">Tabella</div>
@@ -359,6 +380,11 @@
       </div>
       <div id="streamList"></div>
     </div>
+  </div>
+
+  <div class="view" data-view="weekly">
+    <div class="weekly-scroll"><div class="weekly-grid" id="weeklyGrid"></div></div>
+    <div style="font-size:12px;color:var(--grey-500);margin-top:8px">Sotto-task di tutti i task, raggruppate per settimana. Rispetta i filtri attivi. Ticca direttamente il checkbox per marcare come fatta.</div>
   </div>
 
   <div class="view" data-view="matrix">
@@ -469,12 +495,68 @@ const shortDate = d => { if(!d) return "—"; const [y,m,da]=d.split("-"); retur
 const parseDate = d => new Date(d+"T00:00:00");
 const newId = prefix => prefix + "_" + Math.random().toString(36).slice(2,8);
 const escapeHtml = s => (s||"").toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function buildOwnersDatalist(excludeList){
+function getAllOwners(){
+  const set = new Set();
+  DATA.tasks.forEach(t=>{
+    (t.owners||[]).forEach(o=>{ if(o) set.add(o); });
+    (t.subtasks||[]).forEach(s=>{ if(s.owner) set.add(s.owner); });
+  });
+  return Array.from(set).sort((a,b)=>a.localeCompare(b));
+}
+function buildOwnersDatalist(excludeList, id){
   const excluded = new Set(excludeList||[]);
-  const allOwners = Array.from(new Set(DATA.tasks.flatMap(t=>t.owners||[])))
-    .filter(o=>o && !excluded.has(o))
-    .sort((a,b)=>a.localeCompare(b));
-  return `<datalist id="owner_suggestions">${allOwners.map(o=>`<option value="${escapeHtml(o)}">`).join("")}</datalist>`;
+  const listId = id || "owner_suggestions";
+  const allOwners = getAllOwners().filter(o=>!excluded.has(o));
+  return `<datalist id="${listId}">${allOwners.map(o=>`<option value="${escapeHtml(o)}">`).join("")}</datalist>`;
+}
+/* ISO week helpers */
+function getISOWeek(date){
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNum = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2,'0')}`;
+}
+function buildWeekOptions(selected){
+  const today = new Date();
+  const opts = [{ v:"", l:"— Nessuna settimana" }];
+  for(let i=0;i<8;i++){
+    const d = new Date(today); d.setDate(d.getDate()+i*7);
+    const iso = getISOWeek(d);
+    const wn = iso.split("-W")[1];
+    let label;
+    if(i===0) label = `Questa settimana (W${wn})`;
+    else if(i===1) label = `Settimana prossima (W${wn})`;
+    else label = `Tra ${i} settimane (W${wn})`;
+    opts.push({ v:iso, l:label });
+  }
+  if(selected && !opts.some(o=>o.v===selected)){
+    opts.push({ v:selected, l:`Personalizzata: ${selected}` });
+  }
+  return opts;
+}
+function weekBucket(weekStr){
+  // Ritorna il "bucket" per la weekly view: 'overdue' | 'current' | 'plus1' | 'plus2' | 'plus3' | 'future' | 'none'
+  if(!weekStr) return 'none';
+  const current = getISOWeek(new Date());
+  if(weekStr === current) return 'current';
+  // match 'YYYY-W##'
+  const m = weekStr.match(/^(\d{4})-W(\d{1,2})$/);
+  if(!m) return 'none';
+  const target = { y:+m[1], w:+m[2] };
+  const curM = current.match(/^(\d{4})-W(\d{1,2})$/);
+  const cur = { y:+curM[1], w:+curM[2] };
+  // Converti in "week index" approssimativo
+  const targetIdx = target.y*53 + target.w;
+  const curIdx = cur.y*53 + cur.w;
+  const delta = targetIdx - curIdx;
+  if(delta < 0) return 'overdue';
+  if(delta === 1) return 'plus1';
+  if(delta === 2) return 'plus2';
+  if(delta === 3) return 'plus3';
+  if(delta > 3) return 'future';
+  return 'none';
 }
 function nextSortOrder(arr){
   return (arr.reduce((m,x)=>Math.max(m,x.sort_order||0),0) + 10);
@@ -587,7 +669,7 @@ function fillFilters(){
     stream: $("#fStream") ? $("#fStream").value : "",
     obj:    $("#fObj")    ? $("#fObj").value    : ""
   };
-  const owners = Array.from(new Set(DATA.tasks.flatMap(t=>t.owners||[]))).sort();
+  const owners = getAllOwners();
   $("#fOwner").innerHTML = `<option value="">Tutti</option>`+owners.map(o=>`<option>${escapeHtml(o)}</option>`).join("");
   $("#fStream").innerHTML = `<option value="">Tutti</option>`+DATA.streams.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join("");
   $("#fObj").innerHTML = `<option value="">Tutti</option>`+DATA.objectives.map(o=>`<option value="${o.id}">${escapeHtml(o.title)}</option>`).join("");
@@ -600,7 +682,11 @@ function getFilteredTasks(){
   const fo = $("#fOwner").value, fs = $("#fStream").value, fob = $("#fObj").value;
   const fp = +$("#fPrio").value, fst = $("#fStatus").value;
   return DATA.tasks.filter(t=>{
-    if(fo && !(t.owners||[]).includes(fo)) return false;
+    if(fo){
+      const inMain = (t.owners||[]).includes(fo);
+      const inSub  = (t.subtasks||[]).some(s=>s.owner===fo);
+      if(!inMain && !inSub) return false;
+    }
     if(fs && t.stream!==fs) return false;
     if(fob && !(t.objectives||[]).some(o=>o.obj===fob)) return false;
     if(fp && (+t.priority||0)<fp) return false;
@@ -654,12 +740,18 @@ function taskRowHtml(t){
     ? `<span class="sub-badge mono ${allDone?'all-done':''}" title="${subDone} completate su ${subTotal}">${subDone}/${subTotal}</span>
        <button class="sub-chev" onclick="event.stopPropagation();togglePanel('${t.id}')" title="Mostra sotto-task">▾</button>`
     : '';
-  const subLines = subs.map(s=>`
+  const subLines = subs.map(s=>{
+    const weekLabel = s.week?s.week.replace(/^\d{4}-/,''):'';
+    return `
     <div class="subtask-line" onclick="event.stopPropagation()">
       <input type="checkbox" ${s.done?'checked':''} onchange="toggleSubtaskDone('${t.id}','${s.id}',this.checked)">
       <span class="st-text ${s.done?'done':''}">${escapeHtml(s.text||"")}</span>
-      ${s.week?`<span class="st-week">${escapeHtml(s.week)}</span>`:'<span></span>'}
-    </div>`).join("");
+      <span style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+        ${s.owner?`<span class="st-owner">${escapeHtml(s.owner)}</span>`:''}
+        ${weekLabel?`<span class="st-week">${escapeHtml(weekLabel)}</span>`:''}
+      </span>
+    </div>`;
+  }).join("");
   return `
     <div class="task-row" onclick="openTaskEditor('${t.id}')">
       <span class="prio p${t.priority}">${t.priority}</span>
@@ -686,16 +778,17 @@ async function toggleSubtaskDone(taskId, subId, done){
   if(!task) return;
   const sub = (task.subtasks||[]).find(s=>s.id===subId);
   if(!sub) return;
+  const prevDone = sub.done, prevDoneAt = sub.done_at;
   sub.done = done;
+  sub.done_at = done ? new Date().toISOString() : null;
   setSaveStatus("saving");
   try{
     const { error } = await sb.from("tasks").update({ subtasks: task.subtasks }).eq("id", taskId);
     if(error) throw error;
     setSaveStatus("ok");
-    // re-render per aggiornare badge/progress
     renderFilteredViews();
   }catch(e){
-    sub.done = !done;
+    sub.done = prevDone; sub.done_at = prevDoneAt;
     setSaveStatus("error");
     alert("Errore salvataggio sotto-task: "+(e.message||e));
   }
@@ -789,8 +882,61 @@ function renderTable(){
   }).join("");
 }
 
+function renderWeekly(){
+  const tasks = getFilteredTasks();
+  const fo = $("#fOwner").value;
+  const items = [];
+  tasks.forEach(t=>{
+    (t.subtasks||[]).forEach(s=>{
+      if(fo){
+        const inSub = s.owner===fo;
+        const inMainNoSubOwner = (t.owners||[]).includes(fo) && !s.owner;
+        if(!inSub && !inMainNoSubOwner) return;
+      }
+      items.push({ sub:s, task:t, bucket:weekBucket(s.week) });
+    });
+  });
+  items.sort((a,b)=>(a.sub.done?1:0)-(b.sub.done?1:0) || (a.sub.text||"").localeCompare(b.sub.text||""));
+  const buckets = [
+    { k:'overdue', label:'In ritardo',         cls:'overdue'   },
+    { k:'current', label:'Questa settimana',   cls:'this-week' },
+    { k:'plus1',   label:'Settimana prossima', cls:''          },
+    { k:'plus2',   label:'Tra 2 settimane',    cls:''          },
+    { k:'plus3',   label:'Tra 3 settimane',    cls:''          },
+    { k:'future',  label:'Più avanti',         cls:''          },
+    { k:'none',    label:'Senza settimana',    cls:''          }
+  ];
+  $("#weeklyGrid").innerHTML = buckets.map(b=>{
+    const list = items.filter(it=>{
+      if(it.bucket!==b.k) return false;
+      if(b.k==='overdue' && it.sub.done) return false;
+      return true;
+    });
+    const cards = list.length===0
+      ? '<div class="weekly-empty">Nulla qui</div>'
+      : list.map(it=>{
+          const weekLbl = it.sub.week ? it.sub.week.replace(/^\d{4}-/,'') : '';
+          return `<div class="weekly-card ${it.sub.done?'done':''}" onclick="openTaskEditor('${it.task.id}')">
+            <input type="checkbox" ${it.sub.done?'checked':''} onclick="event.stopPropagation()" onchange="toggleSubtaskDone('${it.task.id}','${it.sub.id}',this.checked)">
+            <div>
+              <div class="wt-text">${escapeHtml(it.sub.text||'')}</div>
+              <div class="wt-meta">
+                ${it.sub.owner?`<span class="owner-chip">${escapeHtml(it.sub.owner)}</span>`:''}
+                ${weekLbl?`<span class="st-week">${escapeHtml(weekLbl)}</span>`:''}
+                <span class="wt-parent">← ${escapeHtml(it.task.name)}</span>
+              </div>
+            </div>
+          </div>`;
+        }).join("");
+    return `<div class="week-col ${b.cls}">
+      <h4>${b.label}<span class="count">${list.length}</span></h4>
+      <div class="week-col-body">${cards}</div>
+    </div>`;
+  }).join("");
+}
+
 function renderFilteredViews(){
-  renderTree(); renderMatrix(); renderGantt(); renderTable();
+  renderTree(); renderWeekly(); renderMatrix(); renderGantt(); renderTable();
 }
 function renderAll(){
   fillFilters();
@@ -863,34 +1009,42 @@ function openTaskEditor(taskId, streamIdPrefill){
     </div>
     <div class="field full">
       <label>Sotto-task settimanali</label>
-      <div class="field-hint" style="margin-bottom:6px">Checkbox = fatto. Il campo "settimana" è libero (es. "W17", "Apr 20-26", "questa sett."). Si salva al click su Salva.</div>
+      <div class="field-hint" style="margin-bottom:6px">Per ogni sotto-task: testo, owner assegnato, settimana. Le modifiche si salvano con Salva in fondo.</div>
       <div id="f_subtasks_list">${renderSubtaskEditRows(t.subtasks||[])}</div>
       <div class="subtask-add">
         <input type="text" id="f_sub_new_text" placeholder="Nuova sotto-task…" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubtaskEdit()}">
-        <input type="text" id="f_sub_new_week" placeholder="Settimana (opt)">
+        <input type="text" id="f_sub_new_owner" list="sub_owner_suggestions" placeholder="Owner (opt)">
+        <select id="f_sub_new_week">${buildWeekOptions("").map(o=>`<option value="${o.v}">${o.l}</option>`).join("")}</select>
         <button type="button" class="btn small primary" onclick="addSubtaskEdit()">+ Aggiungi</button>
       </div>
+      ${buildOwnersDatalist([], "sub_owner_suggestions")}
     </div>
   `, !!taskId);
 }
 function renderSubtaskEditRows(subtasks){
   if(!subtasks || subtasks.length===0) return '<div class="field-hint">Nessuna sotto-task.</div>';
-  return subtasks.map((s,i)=>`
+  return subtasks.map((s,i)=>{
+    const weekOpts = buildWeekOptions(s.week||"").map(o=>`<option value="${o.v}" ${o.v===(s.week||"")?'selected':''}>${o.l}</option>`).join("");
+    return `
     <div class="subtask-edit-row">
-      <input type="checkbox" ${s.done?'checked':''} onchange="DATA._edit.subtasks[${i}].done=this.checked">
+      <input type="checkbox" ${s.done?'checked':''} onchange="DATA._edit.subtasks[${i}].done=this.checked;DATA._edit.subtasks[${i}].done_at=this.checked?new Date().toISOString():null">
       <input type="text" value="${escapeHtml(s.text||'')}" onchange="DATA._edit.subtasks[${i}].text=this.value" placeholder="Testo sotto-task">
-      <input type="text" value="${escapeHtml(s.week||'')}" onchange="DATA._edit.subtasks[${i}].week=this.value" placeholder="W..">
+      <input type="text" list="sub_owner_suggestions" value="${escapeHtml(s.owner||'')}" onchange="DATA._edit.subtasks[${i}].owner=this.value" placeholder="Owner">
+      <select onchange="DATA._edit.subtasks[${i}].week=this.value">${weekOpts}</select>
       <button type="button" class="btn icon danger" onclick="removeSubtaskEdit(${i})" title="Elimina">✕</button>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 function addSubtaskEdit(){
   const text = ($("#f_sub_new_text").value||"").trim();
   if(!text) return;
-  const week = ($("#f_sub_new_week").value||"").trim();
+  const owner = ($("#f_sub_new_owner").value||"").trim();
+  const week = $("#f_sub_new_week").value||"";
   DATA._edit.subtasks = DATA._edit.subtasks || [];
-  DATA._edit.subtasks.push({ id:newId("st"), text, done:false, week });
+  DATA._edit.subtasks.push({ id:newId("st"), text, done:false, done_at:null, owner, week });
   $("#f_sub_new_text").value = "";
-  $("#f_sub_new_week").value = "";
+  $("#f_sub_new_owner").value = "";
+  $("#f_sub_new_week").selectedIndex = 0;
   $("#f_subtasks_list").innerHTML = renderSubtaskEditRows(DATA._edit.subtasks);
   $("#f_sub_new_text").focus();
 }
