@@ -24,8 +24,9 @@
   button{font-family:inherit}
   /* Header */
   header{border-bottom:2px solid var(--black);padding:20px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
-  .brand-mark{display:flex;align-items:center;gap:12px}
-  .brand-dot{width:14px;height:14px;background:var(--lime);border:2px solid var(--black)}
+  .brand-mark{display:flex;align-items:center;gap:14px}
+  .brand-logo{height:44px;width:auto;display:block}
+  .brand-logo.lg{height:64px;margin:0 auto 18px}
   .brand-sub{font-family:'Atkinson Hyperlegible';font-size:12px;color:var(--grey-500);text-transform:uppercase;letter-spacing:.12em;margin-top:6px}
   .header-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .header-meta{font-size:11px;color:var(--grey-500);text-transform:uppercase;letter-spacing:.08em;margin-right:8px}
@@ -210,44 +211,22 @@
 </head>
 <body>
 
-<!-- LOGIN GATE -->
-<div class="login-gate" id="loginGate" style="display:flex">
-  <div class="login-box">
-    <div class="brand-mark">
-      <span class="brand-dot"></span>
-      <h1 style="font-size:24px">STANDARD FOOTBALL</h1>
-    </div>
-    <h2>Accedi alla dashboard</h2>
-    <p>Inserisci la tua email. Ti arriverà un link per entrare senza password.</p>
-    <div class="field">
-      <input id="loginEmail" type="email" placeholder="tuo.nome@stdfootball.com" autocomplete="email">
-    </div>
-    <button class="btn primary" style="width:100%" id="loginBtn" onclick="sendMagicLink()">Invia link di accesso</button>
-    <div id="loginMsg" class="msg" style="display:none"></div>
-  </div>
-</div>
-
 <!-- LOADING -->
 <div class="loading" id="loading"><div class="spinner"></div><div style="font-family:'Antonio';letter-spacing:.1em;text-transform:uppercase;font-size:12px">Caricamento…</div></div>
 
-<header id="mainHeader" style="display:none">
+<header id="mainHeader">
   <div class="brand-mark">
-    <span class="brand-dot"></span>
-    <div>
-      <h1>STANDARD FOOTBALL</h1>
-      <div class="brand-sub">Tasks & Streams — Project Dashboard</div>
-    </div>
+    <img src="LOGO-BLACK.png" alt="Standard Football" class="brand-logo">
+    <div class="brand-sub">Tasks & Streams — Project Dashboard</div>
   </div>
   <div class="header-actions">
     <span class="save-status" id="saveStatus"><span class="led"></span><span id="saveStatusText">Sincronizzato</span></span>
     <span class="header-meta" id="today"></span>
-    <span class="user-chip"><span class="led"></span><span id="userEmail">—</span></span>
     <button class="btn small" onclick="exportData()">Export JSON</button>
-    <button class="btn small" onclick="signOut()">Logout</button>
   </div>
 </header>
 
-<main id="mainContent" style="display:none">
+<main id="mainContent">
 
 <section>
   <div class="kpi" id="kpiRow"></div>
@@ -439,35 +418,6 @@ function setSaveStatus(state, text){
   if(state==="saving") s.classList.add("saving");
   if(state==="error") s.classList.add("error");
   $("#saveStatusText").textContent = text || (state==="saving"?"Sincronizzando…":state==="error"?"Errore sync":"Sincronizzato");
-}
-
-/* ============================================================
-   AUTH
-   ============================================================ */
-async function sendMagicLink(){
-  const email = $("#loginEmail").value.trim();
-  if(!email || !email.includes("@")){ showLoginMsg("Inserisci un'email valida.","err"); return; }
-  $("#loginBtn").disabled = true;
-  $("#loginBtn").textContent = "Invio…";
-  const { error } = await sb.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: window.location.href }
-  });
-  $("#loginBtn").disabled = false;
-  $("#loginBtn").textContent = "Invia link di accesso";
-  if(error){ showLoginMsg("Errore: "+error.message,"err"); return; }
-  showLoginMsg("Link inviato! Controlla la posta ("+email+") e clicca il link per entrare.","ok");
-}
-function showLoginMsg(text,kind){
-  const el = $("#loginMsg");
-  el.textContent = text;
-  el.className = "msg " + (kind||"");
-  el.style.display = "block";
-}
-async function signOut(){
-  if(!confirm("Vuoi fare logout?")) return;
-  await sb.auth.signOut();
-  location.reload();
 }
 
 /* ============================================================
@@ -1021,18 +971,6 @@ function exportData(){
    INIT
    ============================================================ */
 async function bootstrap(){
-  // Parse hash for magic link tokens (Supabase gestisce automaticamente)
-  const { data: { session } } = await sb.auth.getSession();
-  if(!session){
-    $("#loginGate").style.display = "flex";
-    $("#mainHeader").style.display = "none";
-    $("#mainContent").style.display = "none";
-    return;
-  }
-  $("#loginGate").style.display = "none";
-  $("#mainHeader").style.display = "";
-  $("#mainContent").style.display = "";
-  $("#userEmail").textContent = session.user.email || "—";
   $("#loading").classList.add("on");
   try{
     await loadData();
@@ -1060,16 +998,6 @@ $$(".tab").forEach(tab=>{
 });
 // Modal keyboard
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeModal(); });
-// Enter on login email = invia link
-$("#loginEmail").addEventListener("keydown",e=>{ if(e.key==="Enter") sendMagicLink(); });
-// Listen auth changes (magic link redirect)
-sb.auth.onAuthStateChange((event, session)=>{
-  if(event==="SIGNED_IN" && session){
-    bootstrap();
-  } else if(event==="SIGNED_OUT"){
-    location.reload();
-  }
-});
 
 bootstrap();
 </script>
